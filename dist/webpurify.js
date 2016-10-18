@@ -66,14 +66,16 @@ var WebPurify = (function () {
   _createClass(WebPurify, [{
     key: 'request',
     value: function request(host, path, method, ssl) {
+      var timeout = arguments.length <= 4 || arguments[4] === undefined ? 10000 : arguments[4];
+
       var options = {
         hostname: host,
         path: path,
         method: method
       };
-      var base_type = ssl ? _http2['default'] : _https2['default'];
+      var connection_type = ssl ? _http2['default'] : _https2['default'];
       return new _Promise(function (resolve, reject) {
-        var req = base_type.request(options, function (res) {
+        var req = connection_type.request(options, function (res) {
           var chunks = [];
           res.on('data', chunks.push.bind(chunks));
           res.on('end', function () {
@@ -85,6 +87,11 @@ var WebPurify = (function () {
             }
           });
         });
+        req.on('socket', function (socket) {
+          socket.setTimeout(timeout, function () {
+            reject('Timed out');
+          });
+        });
         req.on('error', function (error) {
           return reject(error);
         });
@@ -93,13 +100,16 @@ var WebPurify = (function () {
     }
   }, {
     key: 'get',
-    value: function get(params, options) {
+    value: function get(params, options, timeout) {
       var query = _Object$assign(this.query_base, params);
       if (options !== null) query = _Object$assign(query, options);
-      var path = _url2['default'].format({ pathname: this.request_base.path, query: query });
+      var path = _url2['default'].format({
+        pathname: this.request_base.path,
+        query: query
+      });
 
       return new _Promise((function (resolve, reject) {
-        this.request(this.request_base.host, path, 'GET', this.options.enterprise).then(function (parsed) {
+        this.request(this.request_base.host, path, 'GET', this.options.enterprise, timeout).then(function (parsed) {
           var rsp = parsed ? parsed.rsp : null;
           if (!rsp || !rsp.hasOwnProperty('@attributes')) {
             var error = new Error("Malformed Webpurify response");
@@ -108,13 +118,17 @@ var WebPurify = (function () {
           }
 
           if (rsp.hasOwnProperty('err')) {
-            var err_attrs = rsp.err['@attributes'] || { msg: "Unknown Webpurify Error" };
+            var err_attrs = rsp.err['@attributes'] || {
+              msg: "Unknown Webpurify Error"
+            };
             var error = new Error(err_attrs.msg);
             error.code = err_attrs.code;
             return reject(error);
           }
 
           return resolve(WebPurify.prototype.strip(rsp));
+        }, function (error) {
+          return console.log(error);
         });
       }).bind(this));
     }
@@ -131,41 +145,54 @@ var WebPurify = (function () {
     }
   }, {
     key: 'check',
-    value: function check(text, options) {
+    value: function check(text, options, timeout) {
       var method = 'webpurify.live.check';
-      var params = { method: method, text: text };
+      var params = {
+        method: method,
+        text: text
+      };
 
-      return this.get(params, options).then(function (res) {
+      return this.get(params, options, timeout).then(function (res) {
         return res.found === '1';
       });
     }
   }, {
     key: 'checkCount',
-    value: function checkCount(text, options) {
+    value: function checkCount(text, options, timeout) {
       var method = 'webpurify.live.checkcount';
-      var params = { method: method, text: text };
+      var params = {
+        method: method,
+        text: text
+      };
 
-      return this.get(params, options).then(function (res) {
+      return this.get(params, options, timeout).then(function (res) {
         return parseInt(res.found, 10);
       });
     }
   }, {
     key: 'replace',
-    value: function replace(text, replace_symbol, options) {
+    value: function replace(text, replace_symbol, options, timeout) {
       var method = 'webpurify.live.replace';
-      var params = { method: method, text: text, replacesymbol: replace_symbol };
+      var params = {
+        method: method,
+        text: text,
+        replacesymbol: replace_symbol
+      };
 
-      return this.get(params, options).then(function (res) {
+      return this.get(params, options, timeout).then(function (res) {
         return res.text;
       });
     }
   }, {
     key: 'return',
-    value: function _return(text, options) {
+    value: function _return(text, options, timeout) {
       var method = 'webpurify.live.return';
-      var params = { method: method, text: text };
+      var params = {
+        method: method,
+        text: text
+      };
 
-      return this.get(params, options).then(function (res) {
+      return this.get(params, options, timeout).then(function (res) {
         return [].concat(res.expletive).filter(function (w) {
           return typeof w === 'string';
         });
@@ -175,7 +202,11 @@ var WebPurify = (function () {
     key: 'addToBlacklist',
     value: function addToBlacklist(word, deep_search) {
       var method = 'webpurify.live.addtoblacklist';
-      var params = { method: method, word: word, ds: deep_search };
+      var params = {
+        method: method,
+        word: word,
+        ds: deep_search
+      };
 
       return this.get(params).then(function (res) {
         return res.success === '1';
@@ -185,7 +216,10 @@ var WebPurify = (function () {
     key: 'removeFromBlacklist',
     value: function removeFromBlacklist(word) {
       var method = 'webpurify.live.removefromblacklist';
-      var params = { method: method, word: word };
+      var params = {
+        method: method,
+        word: word
+      };
 
       return this.get(params).then(function (res) {
         return res.success === '1';
@@ -195,7 +229,9 @@ var WebPurify = (function () {
     key: 'getBlacklist',
     value: function getBlacklist() {
       var method = 'webpurify.live.getblacklist';
-      var params = { method: method };
+      var params = {
+        method: method
+      };
 
       return this.get(params).then(function (res) {
         return [].concat(res.word).filter(function (w) {
@@ -207,7 +243,10 @@ var WebPurify = (function () {
     key: 'addToWhitelist',
     value: function addToWhitelist(word) {
       var method = 'webpurify.live.addtowhitelist';
-      var params = { method: method, word: word };
+      var params = {
+        method: method,
+        word: word
+      };
 
       return this.get(params).then(function (res) {
         return res.success === '1';
@@ -217,7 +256,10 @@ var WebPurify = (function () {
     key: 'removeFromWhitelist',
     value: function removeFromWhitelist(word) {
       var method = 'webpurify.live.removefromwhitelist';
-      var params = { method: method, word: word };
+      var params = {
+        method: method,
+        word: word
+      };
 
       return this.get(params).then(function (res) {
         return res.success === '1';
@@ -227,7 +269,9 @@ var WebPurify = (function () {
     key: 'getWhitelist',
     value: function getWhitelist() {
       var method = 'webpurify.live.getwhitelist';
-      var params = { method: method };
+      var params = {
+        method: method
+      };
 
       return this.get(params).then(function (res) {
         return [].concat(res.word).filter(function (w) {
