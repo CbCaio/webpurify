@@ -66,7 +66,7 @@ var WebPurify = (function () {
   _createClass(WebPurify, [{
     key: 'request',
     value: function request(host, path, method, ssl) {
-      var timeout = arguments.length <= 4 || arguments[4] === undefined ? 10000 : arguments[4];
+      var timeout = arguments.length <= 4 || arguments[4] === undefined ? 5000 : arguments[4];
 
       var options = {
         hostname: host,
@@ -128,7 +128,7 @@ var WebPurify = (function () {
 
           return resolve(WebPurify.prototype.strip(rsp));
         }, function (error) {
-          return console.log(error);
+          return reject(error);
         });
       }).bind(this));
     }

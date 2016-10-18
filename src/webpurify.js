@@ -126,7 +126,7 @@ export default class WebPurify {
           }
 
           return resolve(WebPurify.prototype.strip(rsp));
-        }, (error) => console.log(error));
+        }, (error) => reject(error));
     }.bind(this));
   }
 
